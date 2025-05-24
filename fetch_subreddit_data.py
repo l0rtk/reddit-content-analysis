@@ -66,7 +66,7 @@ def fetch_subreddit_data_logic(subreddit_name: str, time_filter: str = "month", 
         print(f"Error fetching posts from r/{subreddit_name}: {e}")
         sys.exit(1)
 
-def main(subreddit: str, time_filter: str, limit: int, output_filename: str):
+def main(subreddit: str, time_filter: str, limit: int):
 
     # Fetch data
     data = fetch_subreddit_data_logic(subreddit, time_filter, limit)
@@ -83,14 +83,7 @@ def main(subreddit: str, time_filter: str, limit: int, output_filename: str):
         "posts": data
     }
     
-    # Save to JSON file
-    try:
-        with open(output_filename, 'w', encoding='utf-8') as f:
-            json.dump(output_data, f, indent=2, ensure_ascii=False)
-        print(f"Successfully saved {len(data)} posts to {output_filename}")
-    except Exception as e:
-        print(f"Error saving to file {output_filename}: {e}")
-        sys.exit(1)
+    return output_data
 
 if __name__ == "__main__":
-    main("programming", 'month', 2, "test.json") 
+    main("programming", 'month', 2) 
