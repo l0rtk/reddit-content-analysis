@@ -62,7 +62,7 @@ def fetch_subreddit_data_logic(subreddit_name: str, time_filter: str, limit: int
     return posts_data
 
 
-def fetch_subreddit_data(subreddit: str, time_filter: str = "month", limit: int = 10):
+def fetch_and_save_subreddit_data(subreddit: str, time_filter: str = "month", limit: int = 10):
     try:
         # Fetch data
         data = fetch_subreddit_data_logic(subreddit, time_filter, limit)

@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 import uvicorn
-from src.reddit.fetch_subreddit_data import fetch_subreddit_data
+from src.reddit.fetch_subreddit_data import fetch_and_save_subreddit_data
 
 app = FastAPI()
 
@@ -12,7 +12,7 @@ async def root():
 @app.post("/fetch-subreddit-data")
 async def fetch_subreddit_data_endpoint(subreddit: str, time_filter: str = "month", limit: int = 10):
     print(subreddit, time_filter, limit)
-    data = fetch_subreddit_data(subreddit, time_filter, limit)
+    data = fetch_and_save_subreddit_data(subreddit, time_filter, limit)
     return data
 
 
