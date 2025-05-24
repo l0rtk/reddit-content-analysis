@@ -1,9 +1,15 @@
 import praw
 from datetime import datetime
 from dotenv import load_dotenv
+import pymongo
 import os
 
+
 load_dotenv()
+
+client = pymongo.MongoClient(os.getenv("MONGODB_URI"))
+db = client["techbro"]
+collection = db["reddit_posts"]
 
 
 reddit = praw.Reddit(
@@ -40,6 +46,7 @@ def fetch_subreddit_data_logic(subreddit_name: str, time_filter: str, limit: int
             post_info = {
                 "id": submission.id,
                 "title": submission.title,
+                "body": submission.selftext,
                 "score": submission.score,
                 "date": submission.created_utc,
                 "url": submission.url,
@@ -56,23 +63,84 @@ def fetch_subreddit_data_logic(subreddit_name: str, time_filter: str, limit: int
 
 
 def fetch_subreddit_data(subreddit: str, time_filter: str = "month", limit: int = 10):
-
-    # Fetch data
-    data = fetch_subreddit_data_logic(subreddit, time_filter, limit)
-    
-    # Prepare output structure
-    output_data = {
-        "metadata": {
+    try:
+        # Fetch data
+        data = fetch_subreddit_data_logic(subreddit, time_filter, limit)
+        
+        # Track save status for each post
+        save_status = {
+            "updated": 0,
+            "inserted": 0,
+            "failed": 0,
+            "errors": []
+        }
+        
+        # Save or update each post as an independent document
+        for post in data:
+            try:
+                # Create a complete document with metadata
+                document = {
+                    **post,  # Include all post data
+                    "subreddit": subreddit,
+                    "time_filter": time_filter,
+                    "fetch_timestamp": datetime.now().isoformat(),
+                    "fetch_limit": limit
+                }
+                
+                # Try to update or insert the document
+                result = collection.update_one(
+                    {"id": post["id"]},  # Find by post ID
+                    {"$set": document},  # Update with new data
+                    upsert=True  # Insert if not found
+                )
+                
+                if result.upserted_id:
+                    save_status["inserted"] += 1
+                elif result.modified_count > 0:
+                    save_status["updated"] += 1
+                else:
+                    save_status["failed"] += 1
+                    save_status["errors"].append(f"Failed to save/update post {post.get('id', 'unknown')}")
+                    
+            except Exception as e:
+                save_status["failed"] += 1
+                save_status["errors"].append(f"Error saving/updating post {post.get('id', 'unknown')}: {str(e)}")
+        
+        # Print save status
+        print(f"Save status: {save_status['inserted']} inserted, {save_status['updated']} updated, {save_status['failed']} failed")
+        if save_status["errors"]:
+            print("Errors encountered:")
+            for error in save_status["errors"]:
+                print(f"- {error}")
+        
+        return {
             "subreddit": subreddit,
             "time_filter": time_filter,
             "limit": limit,
             "fetch_timestamp": datetime.now().isoformat(),
-            "total_posts": len(data)
-        },
-        "posts": data
-    }
-    
-    return output_data
+            "total_posts": len(data),
+            "save_status": save_status
+        }
+        
+    except Exception as e:
+        print(f"Error in fetch_subreddit_data: {e}")
+        return {
+            "subreddit": subreddit,
+            "time_filter": time_filter,
+            "limit": limit,
+            "fetch_timestamp": datetime.now().isoformat(),
+            "total_posts": 0,
+            "error": str(e),
+            "save_status": {
+                "updated": 0,
+                "inserted": 0,
+                "failed": 0,
+                "errors": [str(e)]
+            }
+        }
+
+
+
 
 if __name__ == "__main__":
     fetch_subreddit_data("programming", 'month', 2) 
