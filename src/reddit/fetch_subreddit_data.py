@@ -32,20 +32,10 @@ def get_comment_data(comment):
                 comment_data["replies"].append(reply_data)
     return comment_data
 
-def fetch_subreddit_data_logic(subreddit_name: str, time_filter: str = "month", limit: int = 10):
-    try:
-        subreddit = reddit.subreddit(subreddit_name)
-        # Check if subreddit exists
-        subreddit.display_name 
-    except Exception as e:
-        print(f"Error accessing subreddit {subreddit_name}: {e}")
-        sys.exit(1)
-
+def fetch_subreddit_data_logic(subreddit_name: str, time_filter: str, limit: int):
+    subreddit = reddit.subreddit(subreddit_name)
     posts_data = []
-    try:
-        print(f"Fetching top {limit} posts from r/{subreddit_name} (time_filter: {time_filter})...")
-        for i, submission in enumerate(subreddit.top(time_filter=time_filter, limit=limit), 1):
-            print(f"Processing post {i}/{limit}: {submission.title}")
+    for submission in subreddit.top(time_filter=time_filter, limit=limit):
             post_info = {
                 "id": submission.id,
                 "title": submission.title,
@@ -61,12 +51,10 @@ def fetch_subreddit_data_logic(subreddit_name: str, time_filter: str = "month", 
                 if comment_details:
                     post_info["comments"].append(comment_details)
             posts_data.append(post_info)
-        return posts_data
-    except Exception as e:
-        print(f"Error fetching posts from r/{subreddit_name}: {e}")
-        sys.exit(1)
+    return posts_data
 
-def main(subreddit: str, time_filter: str, limit: int):
+
+def fetch_subreddit_data(subreddit: str, time_filter: str = "month", limit: int = 10):
 
     # Fetch data
     data = fetch_subreddit_data_logic(subreddit, time_filter, limit)
@@ -86,4 +74,4 @@ def main(subreddit: str, time_filter: str, limit: int):
     return output_data
 
 if __name__ == "__main__":
-    main("programming", 'month', 2) 
+    fetch_subreddit_data("programming", 'month', 2) 
