@@ -1,17 +1,17 @@
-#!/usr/bin/env python3
 import praw
-import json
-import sys
 from datetime import datetime
+from dotenv import load_dotenv
+import os
 
-# PRAW Authentication (same as api.py)
+load_dotenv()
+
 reddit = praw.Reddit(
-    client_id="0STz-aj6UQnhcWIaEViQ1A",
-    client_secret="BvDg-ZF4GX_G0x0oqVQGl5rbnRJq9Q",
-    user_agent="techbro_cli by /u/Techbro994"
+    client_id=os.getenv("REDDIT_CLIENT_ID"),
+    client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
+    user_agent=os.getenv("REDDIT_USER_AGENT")
 )
 
-# --- Core Reddit fetching logic (from api.py) ---
+
 def get_comment_data(comment):
     if not hasattr(comment, 'body'):
         return None
