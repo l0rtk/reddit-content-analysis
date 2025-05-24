@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import praw
 import json
-import argparse
 import sys
 from datetime import datetime
 
@@ -22,6 +21,7 @@ def get_comment_data(comment):
         "author": str(comment.author),
         "score": comment.score,
         "date": comment.created_utc,
+        "id": comment.id,
         "replies": []
     }
     if hasattr(comment, 'replies') and comment.replies:
@@ -47,6 +47,7 @@ def fetch_subreddit_data_logic(subreddit_name: str, time_filter: str = "month", 
         for i, submission in enumerate(subreddit.top(time_filter=time_filter, limit=limit), 1):
             print(f"Processing post {i}/{limit}: {submission.title}")
             post_info = {
+                "id": submission.id,
                 "title": submission.title,
                 "score": submission.score,
                 "date": submission.created_utc,
@@ -65,37 +66,17 @@ def fetch_subreddit_data_logic(subreddit_name: str, time_filter: str = "month", 
         print(f"Error fetching posts from r/{subreddit_name}: {e}")
         sys.exit(1)
 
-def main():
-    parser = argparse.ArgumentParser(description="Fetch Reddit subreddit data and save to JSON file")
-    parser.add_argument("--subreddit", "-s", required=True, help="Subreddit name (without r/)")
-    parser.add_argument("--time_filter", "-t", default="month", 
-                        choices=["all", "year", "month", "week", "day", "hour"],
-                        help="Time filter for top posts (default: month)")
-    parser.add_argument("--limit", "-l", type=int, default=10, 
-                        help="Number of posts to fetch (default: 10, max: 100)")
-    parser.add_argument("--output", "-o", default="subreddit_data.json",
-                        help="Output JSON file name (default: subreddit_data.json)")
-    
-    args = parser.parse_args()
-    
-    # Validate arguments
-    if args.limit <= 0 or args.limit > 100:
-        print("Error: Limit must be between 1 and 100.")
-        sys.exit(1)
-    
-    if not args.subreddit:
-        print("Error: Subreddit name cannot be empty.")
-        sys.exit(1)
-    
+def main(subreddit: str, time_filter: str, limit: int, output_filename: str):
+
     # Fetch data
-    data = fetch_subreddit_data_logic(args.subreddit, args.time_filter, args.limit)
+    data = fetch_subreddit_data_logic(subreddit, time_filter, limit)
     
     # Prepare output structure
     output_data = {
         "metadata": {
-            "subreddit": args.subreddit,
-            "time_filter": args.time_filter,
-            "limit": args.limit,
+            "subreddit": subreddit,
+            "time_filter": time_filter,
+            "limit": limit,
             "fetch_timestamp": datetime.now().isoformat(),
             "total_posts": len(data)
         },
@@ -104,12 +85,12 @@ def main():
     
     # Save to JSON file
     try:
-        with open(args.output, 'w', encoding='utf-8') as f:
+        with open(output_filename, 'w', encoding='utf-8') as f:
             json.dump(output_data, f, indent=2, ensure_ascii=False)
-        print(f"Successfully saved {len(data)} posts to {args.output}")
+        print(f"Successfully saved {len(data)} posts to {output_filename}")
     except Exception as e:
-        print(f"Error saving to file {args.output}: {e}")
+        print(f"Error saving to file {output_filename}: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
-    main() 
+    main("programming", 'month', 2, "test.json") 
