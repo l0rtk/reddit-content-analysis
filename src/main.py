@@ -65,6 +65,15 @@ async def get_task_status(task_id: str):
     try:
         task_result = celery_app.AsyncResult(task_id)
         
+        # Handle revoked tasks
+        if task_result.state == "REVOKED":
+            return {
+                "task_id": task_id,
+                "state": task_result.state,
+                "status": "Task was cancelled/revoked",
+                "progress": {"current": 0, "total": 0}
+            }
+        
         # Check if task actually exists
         if task_result.state == "PENDING":
             # For PENDING state, we need to distinguish between:
@@ -106,13 +115,15 @@ async def get_task_status(task_id: str):
                 "progress": {"current": 0, "total": 0}
             }
         elif task_result.state == "PROGRESS":
+            # Safely handle task info
+            info = task_result.info or {}
             return {
                 "task_id": task_id,
                 "state": task_result.state,
-                "status": task_result.info.get("status", "Processing..."),
+                "status": info.get("status", "Processing..."),
                 "progress": {
-                    "current": task_result.info.get("current", 0),
-                    "total": task_result.info.get("total", 0)
+                    "current": info.get("current", 0),
+                    "total": info.get("total", 0)
                 }
             }
         elif task_result.state == "SUCCESS":
@@ -122,12 +133,21 @@ async def get_task_status(task_id: str):
                 "status": "Task completed successfully",
                 "result": task_result.result
             }
-        else:  # FAILURE
+        else:  # FAILURE or other states
+            # Safely handle task info for failed tasks
+            info = task_result.info or {}
+            if hasattr(info, 'get'):
+                status = info.get("status", "Task failed")
+                error = info.get("error", str(info))
+            else:
+                status = "Task failed"
+                error = str(info)
+            
             return {
                 "task_id": task_id,
                 "state": task_result.state,
-                "status": task_result.info.get("status", "Task failed"),
-                "error": task_result.info.get("error", str(task_result.info))
+                "status": status,
+                "error": error
             }
     except HTTPException:
         raise
@@ -213,6 +233,93 @@ async def get_worker_status():
             "status": f"Error checking workers: {str(e)}",
             "active_tasks": 0
         }
+
+@app.get("/tasks")
+async def get_all_tasks():
+    """
+    Get information about all tasks (active, scheduled, reserved, and recent results).
+    """
+    try:
+        inspect = celery_app.control.inspect()
+        
+        # Get active, scheduled, and reserved tasks
+        active_tasks = inspect.active() or {}
+        scheduled_tasks = inspect.scheduled() or {}
+        reserved_tasks = inspect.reserved() or {}
+        
+        # Collect all task information
+        all_tasks = []
+        
+        # Process active tasks
+        for worker, tasks in active_tasks.items():
+            for task in tasks:
+                all_tasks.append({
+                    "task_id": task.get("id"),
+                    "name": task.get("name"),
+                    "state": "ACTIVE",
+                    "worker": worker,
+                    "args": task.get("args", []),
+                    "kwargs": task.get("kwargs", {}),
+                    "time_start": task.get("time_start")
+                })
+        
+        # Process scheduled tasks
+        for worker, tasks in scheduled_tasks.items():
+            for task in tasks:
+                all_tasks.append({
+                    "task_id": task.get("id"),
+                    "name": task.get("name"),
+                    "state": "SCHEDULED",
+                    "worker": worker,
+                    "args": task.get("args", []),
+                    "kwargs": task.get("kwargs", {}),
+                    "eta": task.get("eta")
+                })
+        
+        # Process reserved tasks
+        for worker, tasks in reserved_tasks.items():
+            for task in tasks:
+                all_tasks.append({
+                    "task_id": task.get("id"),
+                    "name": task.get("name"),
+                    "state": "RESERVED",
+                    "worker": worker,
+                    "args": task.get("args", []),
+                    "kwargs": task.get("kwargs", {})
+                })
+        
+        # Get recent task results from Redis
+        try:
+            redis_keys = redis_client.keys("celery-task-meta-*")
+            for key in redis_keys[:50]:  # Limit to 50 recent results
+                task_id = key.decode().replace("celery-task-meta-", "")
+                task_result = celery_app.AsyncResult(task_id)
+                
+                # Skip if already in active/scheduled/reserved
+                if any(t["task_id"] == task_id for t in all_tasks):
+                    continue
+                
+                all_tasks.append({
+                    "task_id": task_id,
+                    "name": "fetch_subreddit_data_task",  # Our main task
+                    "state": task_result.state,
+                    "worker": "completed",
+                    "result_available": task_result.state in ["SUCCESS", "FAILURE"]
+                })
+        except Exception as e:
+            print(f"Error getting Redis task results: {e}")
+        
+        return {
+            "total_tasks": len(all_tasks),
+            "active_count": len([t for t in all_tasks if t["state"] == "ACTIVE"]),
+            "scheduled_count": len([t for t in all_tasks if t["state"] == "SCHEDULED"]),
+            "reserved_count": len([t for t in all_tasks if t["state"] == "RESERVED"]),
+            "completed_count": len([t for t in all_tasks if t["state"] in ["SUCCESS", "FAILURE"]]),
+            "tasks": all_tasks
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get tasks: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
