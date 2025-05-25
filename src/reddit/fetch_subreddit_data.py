@@ -12,6 +12,9 @@ db = client["techbro"]
 collection = db["reddit_posts"]
 
 
+print(os.getenv("R_CLIENT_ID"))
+print(os.getenv("R_CLIENT_SECRET"))
+print(os.getenv("R_USER_AGENT"))
 reddit = praw.Reddit(
     client_id=os.getenv("R_CLIENT_ID"),
     client_secret=os.getenv("R_CLIENT_SECRET"),
@@ -42,7 +45,10 @@ def get_comment_data(comment):
 def fetch_subreddit_data_logic(subreddit_name: str, time_filter: str, limit: int):
     subreddit = reddit.subreddit(subreddit_name)
     posts_data = []
+    print('hereeee')
     for submission in subreddit.top(time_filter=time_filter, limit=limit):
+            print('here')
+            print(submission)
             post_info = {
                 "id": submission.id,
                 "title": submission.title,
@@ -64,8 +70,9 @@ def fetch_subreddit_data_logic(subreddit_name: str, time_filter: str, limit: int
 
 def fetch_and_save_subreddit_data(subreddit: str, time_filter: str = "month", limit: int = 10):
     try:
-        # Fetch data
+        print(f"Fetching data for {subreddit} with time filter {time_filter} and limit {limit}")
         data = fetch_subreddit_data_logic(subreddit, time_filter, limit)
+        print(f"Fetched {len(data)} posts")
         
         # Track save status for each post
         save_status = {
@@ -143,4 +150,4 @@ def fetch_and_save_subreddit_data(subreddit: str, time_filter: str = "month", li
 
 
 if __name__ == "__main__":
-    fetch_subreddit_data("programming", 'month', 2) 
+    fetch_and_save_subreddit_data("programming", 'month', 2) 
