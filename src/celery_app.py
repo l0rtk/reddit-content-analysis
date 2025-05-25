@@ -23,5 +23,5 @@ celery_app.conf.update(
         "*": {"rate_limit": "10/s"}
     },
     # Auto-discover tasks
-    imports=["src.reddit.tasks"]
+    imports=["src.reddit.tasks", "src.reddit.new_tasks"]
 ) 
