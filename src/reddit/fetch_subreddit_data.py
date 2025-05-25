@@ -3,6 +3,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 import pymongo
 import os
+import time
 
 
 load_dotenv()
@@ -12,17 +13,84 @@ db = client["techbro"]
 collection = db["reddit_posts"]
 
 
-print(os.getenv("R_CLIENT_ID"))
-print(os.getenv("R_CLIENT_SECRET"))
-print(os.getenv("R_USER_AGENT"))
 reddit = praw.Reddit(
     client_id=os.getenv("R_CLIENT_ID"),
     client_secret=os.getenv("R_CLIENT_SECRET"),
+    username=os.getenv("R_USERNAME"),
+    password=os.getenv("R_PASSWORD"),
     user_agent=os.getenv("R_USER_AGENT")
 )
 
 
+def check_rate_limit(min_remaining=50):
+    """
+    Check Reddit API rate limits and wait if necessary.
+    
+    Args:
+        min_remaining (int): Minimum number of requests to keep in reserve
+    
+    Returns:
+        dict: Rate limit information
+    """
+    try:
+        rate_limit = reddit.auth.limits
+        remaining = rate_limit.get('remaining')
+        used = rate_limit.get('used')
+        reset_time = rate_limit.get('reset_timestamp')
+        
+        # Handle None values
+        if remaining is None or used is None or reset_time is None:
+            print("Rate limit info not available, adding precautionary delay...")
+            time.sleep(1)
+            return None
+            
+        time_until_reset = reset_time - time.time()
+        
+        print(f"Rate limit - Remaining: {remaining}, Used: {used}, Reset in: {time_until_reset:.1f}s")
+        
+        # If we're running low on requests, wait for reset
+        if remaining <= min_remaining:
+            if time_until_reset > 0:
+                print(f"Rate limit low ({remaining} remaining). Waiting {time_until_reset:.1f} seconds for reset...")
+                time.sleep(time_until_reset + 5)  # Add 5 seconds buffer
+                print("Rate limit reset. Continuing...")
+            else:
+                print("Rate limit reset time has passed. Continuing...")
+        
+        return {
+            'remaining': remaining,
+            'used': used,
+            'reset_in_seconds': time_until_reset
+        }
+    except Exception as e:
+        print(f"Error checking rate limit: {e}")
+        # If we can't check rate limits, add a small delay as precaution
+        time.sleep(1)
+        return None
+
+
+def safe_api_call(func, *args, **kwargs):
+    """
+    Wrapper for API calls that checks rate limits before making the call.
+    
+    Args:
+        func: The function to call
+        *args, **kwargs: Arguments to pass to the function
+    
+    Returns:
+        The result of the function call
+    """
+    check_rate_limit()
+    return func(*args, **kwargs)
+
+
 def get_comment_data(comment):
+    """
+    Get comment data for top-level comments only (no replies).
+    
+    Args:
+        comment: Reddit comment object
+    """
     if not hasattr(comment, 'body'):
         return None
 
@@ -31,40 +99,69 @@ def get_comment_data(comment):
         "author": str(comment.author),
         "score": comment.score,
         "date": comment.created_utc,
-        "id": comment.id,
-        "replies": []
+        "id": comment.id
     }
-    if hasattr(comment, 'replies') and comment.replies:
-        comment.replies.replace_more(limit=None)
-        for reply in comment.replies.list():
-            reply_data = get_comment_data(reply)
-            if reply_data:
-                comment_data["replies"].append(reply_data)
+    
     return comment_data
 
 def fetch_subreddit_data_logic(subreddit_name: str, time_filter: str, limit: int):
+    # Initial rate limit check
+    print("Checking initial rate limits...")
+    check_rate_limit()
+    
     subreddit = reddit.subreddit(subreddit_name)
     posts_data = []
-    print('hereeee')
-    for submission in subreddit.top(time_filter=time_filter, limit=limit):
-            print('here')
-            print(submission)
-            post_info = {
-                "id": submission.id,
-                "title": submission.title,
-                "body": submission.selftext,
-                "score": submission.score,
-                "date": submission.created_utc,
-                "url": submission.url,
-                "author": str(submission.author),
-                "comments": []
-            }
-            submission.comments.replace_more(limit=None)
-            for top_level_comment in submission.comments.list():
-                comment_details = get_comment_data(top_level_comment)
-                if comment_details:
-                    post_info["comments"].append(comment_details)
-            posts_data.append(post_info)
+    print(f'Fetching top {limit} posts from r/{subreddit_name}')
+    
+    # Get submissions with rate limit awareness
+    submissions = safe_api_call(subreddit.top, time_filter=time_filter, limit=limit)
+    
+    for i, submission in enumerate(submissions, 1):
+        print(f'Processing post {i}/{limit}: {submission.title[:50]}...')
+        
+        # Check rate limit before processing each post
+        check_rate_limit()
+        
+        post_info = {
+            "id": submission.id,
+            "title": submission.title,
+            "body": submission.selftext,
+            "score": submission.score,
+            "date": submission.created_utc,
+            "url": submission.url,
+            "author": str(submission.author),
+            "comments": []
+        }
+        
+        # Check rate limit before expanding comments
+        print(f"  Fetching top-level comments for post {i}...")
+        check_rate_limit()
+        submission.comments.replace_more(limit=0)  # Don't expand any "more comments"
+        
+        comment_count = 0
+        max_comments = 200  # Increase limit since we're only getting top-level comments
+        
+        # Get only top-level comments (no replies)
+        for top_level_comment in submission.comments:
+            if comment_count >= max_comments:
+                print(f"  Reached comment limit ({max_comments}) for post {i}")
+                break
+                
+            # Check rate limit every 50 comments since we're not fetching replies
+            if comment_count % 50 == 0 and comment_count > 0:
+                check_rate_limit()
+            
+            comment_details = get_comment_data(top_level_comment)
+            if comment_details:
+                post_info["comments"].append(comment_details)
+                comment_count += 1
+        
+        print(f"  Collected {comment_count} comments for post {i}")
+        posts_data.append(post_info)
+        
+        # Small delay between posts to be respectful
+        time.sleep(0.5)
+    
     return posts_data
 
 

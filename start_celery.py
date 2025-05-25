@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """
 Script to start Celery worker for processing Reddit data fetching tasks.
 """

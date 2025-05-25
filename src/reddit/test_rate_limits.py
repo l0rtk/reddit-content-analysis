@@ -14,7 +14,6 @@ reddit = praw.Reddit(
     user_agent=os.getenv("R_USER_AGENT")
 )
 
-print('here')
 print("Logged in as:", reddit.user.me())
 
 rate_limit = reddit.auth.limits
