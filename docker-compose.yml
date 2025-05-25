@@ -24,6 +24,7 @@ services:
     ports:
       - "8000:8000"
     environment:
+      - PYTHONPATH=/app
       - R_CLIENT_ID=${R_CLIENT_ID}
       - R_CLIENT_SECRET=${R_CLIENT_SECRET}
       - R_USERNAME=${R_USERNAME}
@@ -41,6 +42,7 @@ services:
   worker:
     build: .
     environment:
+      - PYTHONPATH=/app
       - R_CLIENT_ID=${R_CLIENT_ID}
       - R_CLIENT_SECRET=${R_CLIENT_SECRET}
       - R_USERNAME=${R_USERNAME}
