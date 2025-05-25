@@ -6,11 +6,49 @@ This is a Reddit data fetcher that runs in the background so your API doesn't ge
 
 Fetches Reddit posts and comments from any subreddit you want. The API queues up the work and you can check on progress or get results when it's done. No more waiting around for Reddit's API to finish.
 
-## What you need
+## Quick start with Docker
+
+This is the easiest way to get everything running. You just need Docker and your Reddit API credentials.
+
+First, copy your Reddit API credentials:
+
+```bash
+cp .env-example .env
+```
+
+Edit the .env file with your Reddit API stuff:
+
+```env
+R_CLIENT_ID=your_reddit_client_id
+R_CLIENT_SECRET=your_reddit_client_secret
+R_USERNAME=your_reddit_username
+R_PASSWORD=your_reddit_password
+R_USER_AGENT=your_user_agent
+```
+
+Then start everything:
+
+```bash
+docker-compose up -d
+```
+
+That's it. The API will be running at http://localhost:8000 and everything else (Redis, MongoDB, Celery worker) is handled automatically.
+
+To see what's happening:
+
+```bash
+docker-compose logs -f
+```
+
+To stop everything:
+
+```bash
+docker-compose down
+```
+
+## Manual setup (if you don't want Docker)
 
 You'll need Redis running for the task queue, MongoDB for storing data, and Reddit API credentials. The whole thing is built with FastAPI and Celery.
-
-## Getting started
 
 First install everything:
 
@@ -32,26 +70,15 @@ brew install redis
 brew services start redis
 ```
 
-Or just use Docker if you prefer:
-
-```bash
-docker run -d -p 6379:6379 redis:alpine
-```
-
 Make a .env file with your Reddit API stuff:
 
 ```env
-# Reddit API Configuration
 R_CLIENT_ID=your_reddit_client_id
 R_CLIENT_SECRET=your_reddit_client_secret
 R_USERNAME=your_reddit_username
 R_PASSWORD=your_reddit_password
 R_USER_AGENT=your_user_agent
-
-# MongoDB Configuration
 MONGODB_URI=mongodb://localhost:27017
-
-# Celery Configuration
 CELERY_BROKER_URL=redis://localhost:6379/0
 CELERY_RESULT_BACKEND=redis://localhost:6379/0
 ```
@@ -110,6 +137,21 @@ Each Reddit post becomes a document in MongoDB with the title, score, author, co
 
 ## Troubleshooting
 
+If you're using Docker and something's not working, check the logs:
+
+```bash
+docker-compose logs api
+docker-compose logs worker
+```
+
 If tasks aren't running, make sure Redis is up and the Celery worker is started. If you're getting rate limited, the fetcher will wait automatically but you might want to reduce the number of posts you're fetching at once.
 
-Check the worker logs to see what's happening. The API will tell you if workers are offline when you check /worker-status.
+## Scaling
+
+Want more workers? Just scale them up:
+
+```bash
+docker-compose up -d --scale worker=3
+```
+
+This will give you 3 worker containers processing jobs in parallel.
