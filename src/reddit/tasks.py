@@ -26,8 +26,19 @@ def fetch_subreddit_data_task(self, subreddit: str, time_filter: str = "month", 
             }
         )
         
-        # Fetch and save the data
-        result = fetch_and_save_subreddit_data(subreddit, time_filter, limit)
+        # Define progress callback function
+        def progress_callback(current, total, status):
+            self.update_state(
+                state="PROGRESS",
+                meta={
+                    "current": current,
+                    "total": total,
+                    "status": status
+                }
+            )
+        
+        # Fetch and save the data with progress updates
+        result = fetch_and_save_subreddit_data(subreddit, time_filter, limit, progress_callback)
         
         # Update final state
         self.update_state(

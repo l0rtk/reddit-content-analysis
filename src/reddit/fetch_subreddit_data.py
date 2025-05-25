@@ -104,7 +104,7 @@ def get_comment_data(comment):
     
     return comment_data
 
-def fetch_subreddit_data_logic(subreddit_name: str, time_filter: str, limit: int):
+def fetch_subreddit_data_logic(subreddit_name: str, time_filter: str, limit: int, progress_callback=None):
     # Initial rate limit check
     print("Checking initial rate limits...")
     check_rate_limit()
@@ -118,6 +118,10 @@ def fetch_subreddit_data_logic(subreddit_name: str, time_filter: str, limit: int
     
     for i, submission in enumerate(submissions, 1):
         print(f'Processing post {i}/{limit}: {submission.title[:50]}...')
+        
+        # Update progress if callback is provided
+        if progress_callback:
+            progress_callback(i, limit, f"Processing post {i}/{limit}: {submission.title[:50]}...")
         
         # Check rate limit before processing each post
         check_rate_limit()
@@ -165,10 +169,10 @@ def fetch_subreddit_data_logic(subreddit_name: str, time_filter: str, limit: int
     return posts_data
 
 
-def fetch_and_save_subreddit_data(subreddit: str, time_filter: str = "month", limit: int = 10):
+def fetch_and_save_subreddit_data(subreddit: str, time_filter: str = "month", limit: int = 10, progress_callback=None):
     try:
         print(f"Fetching data for {subreddit} with time filter {time_filter} and limit {limit}")
-        data = fetch_subreddit_data_logic(subreddit, time_filter, limit)
+        data = fetch_subreddit_data_logic(subreddit, time_filter, limit, progress_callback)
         print(f"Fetched {len(data)} posts")
         
         # Track save status for each post
