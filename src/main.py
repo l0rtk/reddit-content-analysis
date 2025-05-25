@@ -4,7 +4,6 @@ import uvicorn
 from src.reddit.tasks import fetch_subreddit_data_task
 from src.celery_app import celery_app
 import redis
-import json
 
 app = FastAPI(title="Reddit Content Analysis API", version="1.0.0")
 

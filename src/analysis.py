@@ -66,7 +66,7 @@ REDDIT DATA TO ANALYZE:
         comments = post.get('comments', [])
         if comments:
             prompt += f"**Comments ({len(comments)}):**\n"
-            for i, comment in enumerate(comments[:10], 1):  # Limit to first 10 comments
+            for i, comment in enumerate(comments, 1): 
                 comment_body = comment.get('body', '')
                 if comment_body and comment_body.strip() and comment_body not in ['[deleted]', '[removed]']:
                     prompt += f"  {i}. {comment_body}\n"
@@ -109,15 +109,33 @@ def main():
     # Calculate token count
     token_count = count_tokens(analysis_prompt)
     
-    print(f"\n{'='*60}")
+    print(f"\n{'='*70}")
     print(f"PROMPT STATISTICS:")
-    print(f"{'='*60}")
+    print(f"{'='*70}")
     print(f"Total characters: {len(analysis_prompt):,}")
-    print(f"Estimated tokens (GPT-4): {token_count:,}")
-    print(f"Estimated cost (GPT-4 input): ${(token_count * 0.03 / 1000):.4f}")
-    print(f"Estimated cost (GPT-4o input): ${(token_count * 0.005 / 1000):.4f}")
+    print(f"Estimated tokens: {token_count:,}")
+    print(f"")
+    print(f"COST ESTIMATES (INPUT ONLY):")
+    print(f"{'='*70}")
+    
+    # OpenAI Models
+    print(f"OpenAI GPT-4:        ${(token_count * 0.03 / 1000):.4f}")
+    print(f"OpenAI GPT-4o:       ${(token_count * 0.005 / 1000):.4f}")
+    
+    # Llama Models (Groq pricing)
+    print(f"Llama 3.1 8B:        ${(token_count * 0.05 / 1000000):.6f}")
+    print(f"Llama 3.3 70B:       ${(token_count * 0.59 / 1000000):.4f}")
+    
+    print(f"")
+    print(f"RATE LIMITS (Llama 3.3 70B):")
+    print(f"{'='*70}")
+    print(f"Max requests/minute:  1,000")
+    print(f"Max requests/day:     500,000")
+    print(f"Current token count:  {token_count:,} (fits in single request)")
+    
+    print(f"")
     print(f"Prompt saved to: analysis_prompt.txt")
-    print(f"{'='*60}")
+    print(f"{'='*70}")
     
     # Show preview of prompt
     print(f"\nPROMPT PREVIEW (first 500 characters):")
